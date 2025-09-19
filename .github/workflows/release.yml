@@ -1,0 +1,189 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to release'
+        required: true
+        default: 'v1.0.0'
+
+jobs:
+  build:
+    name: Build and Release
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        include:
+          # Linux
+          - os: linux
+            arch: amd64
+            goos: linux
+            goarch: amd64
+          - os: linux
+            arch: arm64
+            goos: linux
+            goarch: arm64
+          - os: linux
+            arch: 386
+            goos: linux
+            goarch: 386
+
+          # macOS
+          - os: darwin
+            arch: amd64
+            goos: darwin
+            goarch: amd64
+          - os: darwin
+            arch: arm64
+            goos: darwin
+            goarch: arm64
+
+          # Windows
+          - os: windows
+            arch: amd64
+            goos: windows
+            goarch: amd64
+          - os: windows
+            arch: 386
+            goos: windows
+            goarch: 386
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.21'
+
+    - name: Get dependencies
+      run: go mod download
+
+    - name: Build binary
+      env:
+        GOOS: ${{ matrix.goos }}
+        GOARCH: ${{ matrix.goarch }}
+        CGO_ENABLED: 0
+      run: |
+        if [ "${{ matrix.goos }}" = "windows" ]; then
+          go build -ldflags="-s -w" -o sshuttle-selector-${{ matrix.os }}-${{ matrix.arch }}.exe main.go
+        else
+          go build -ldflags="-s -w" -o sshuttle-selector-${{ matrix.os }}-${{ matrix.arch }} main.go
+        fi
+
+    - name: Create tarball (non-Windows)
+      if: matrix.goos != 'windows'
+      run: |
+        tar -czf sshuttle-selector-${{ matrix.os }}-${{ matrix.arch }}.tar.gz sshuttle-selector-${{ matrix.os }}-${{ matrix.arch }}
+
+    - name: Create zip (Windows)
+      if: matrix.goos == 'windows'
+      run: |
+        zip sshuttle-selector-${{ matrix.os }}-${{ matrix.arch }}.zip sshuttle-selector-${{ matrix.os }}-${{ matrix.arch }}.exe
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: binaries
+        path: |
+          *.tar.gz
+          *.zip
+
+  release:
+    name: Create Release
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Download artifacts
+      uses: actions/download-artifact@v3
+      with:
+        name: binaries
+        path: ./dist
+
+    - name: Generate checksums
+      run: |
+        cd dist
+        sha256sum * > checksums.txt
+        cat checksums.txt
+
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: ${{ github.ref_name }}
+        name: Release ${{ github.ref_name }}
+        body: |
+          ## SSH Tunnel Selector ${{ github.ref_name }}
+
+          ### Downloads
+
+          Choose the appropriate binary for your system:
+
+          #### Linux
+          - **amd64**: `sshuttle-selector-linux-amd64.tar.gz`
+          - **arm64**: `sshuttle-selector-linux-arm64.tar.gz`
+          - **386**: `sshuttle-selector-linux-386.tar.gz`
+
+          #### macOS
+          - **Intel (amd64)**: `sshuttle-selector-darwin-amd64.tar.gz`
+          - **Apple Silicon (arm64)**: `sshuttle-selector-darwin-arm64.tar.gz`
+
+          #### Windows
+          - **amd64**: `sshuttle-selector-windows-amd64.zip`
+          - **386**: `sshuttle-selector-windows-386.zip`
+
+          ### Installation
+
+          1. Download the appropriate binary for your system
+          2. Extract the archive
+          3. Move the binary to your PATH (e.g., `~/bin/` or `/usr/local/bin/`)
+          4. Make it executable: `chmod +x sshuttle-selector`
+
+          ### Configuration
+
+          Create your configuration file at `~/.config/sshuttle-selector/config.yaml`:
+
+          ```yaml
+          tunnels:
+            - name: "Example Server"
+              host: "server.example.com"
+              user: "ubuntu"
+              subnets: "10.0.0.0/8"
+              extra_args: "-i ~/.ssh/key.pem"
+          ```
+
+          ### Usage
+
+          ```bash
+          # Normal mode (daemon)
+          sshuttle-selector
+
+          # Debug mode (foreground with verbose logging)
+          sshuttle-selector --debug
+          ```
+
+          ### What's Changed
+
+          - Interactive TUI for SSH tunnel management
+          - Support for active tunnel monitoring and termination
+          - YAML-based configuration
+          - Debug mode with verbose logging
+          - Cross-platform support
+
+          **Full Changelog**: https://github.com/tgigli/sshuttle-selector-go/commits/${{ github.ref_name }}
+        files: |
+          dist/*
+        draft: false
+        prerelease: false
+        generate_release_notes: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
