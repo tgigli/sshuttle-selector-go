@@ -16,19 +16,20 @@ A modern, interactive TUI (Terminal User Interface) for managing SSH tunnels wit
 
 ## Installation
 
-### From Source
+### Using Homebrew
 
 ```bash
-git clone https://github.com/tgigli/sshuttle-selector-go.git
-cd sshuttle-selector-go
-go build -o sshuttle-selector main.go
-cp sshuttle-selector ~/bin/  # or /usr/local/bin/
+# Install sshuttle (dependency)
+brew install sshuttle
+
+# Add tap and install sshuttle-selector
+brew tap tgigli/sshuttle-selector
+brew install sshuttle-selector
 ```
 
 ### Prerequisites
 
-- Go 1.19+
-- `sshuttle` installed on your system
+- `sshuttle` installed via Homebrew
 - SSH access to your servers
 
 ## Configuration
@@ -153,10 +154,10 @@ sshuttle-selector -add -name "Test" -host "test.com" -user "root" -subnets "inva
 
 The TUI is organized into sections:
 
-#### ACTIVE TUNNELS
-- Shows currently running sshuttle processes
-- Click to terminate individual tunnels
-- "Kill All Tunnels" option available
+#### ACTIVE TUNNEL
+- Shows the currently running sshuttle process (only one tunnel can be active)
+- Click to terminate the active tunnel
+- Starting a new tunnel automatically stops the existing one
 
 #### AVAILABLE TUNNELS
 - Shows configured tunnels from your YAML file
@@ -199,11 +200,6 @@ The TUI is organized into sections:
 
 ## Debug Mode
 
-When running with `--debug`:
-- Removes `--daemon` flag (runs in foreground)
-- Adds `-v` flag to `sshuttle` (verbose)
-- Adds `-vvv` flag to `ssh` (very verbose)
-
 ```bash
 sshuttle-selector --debug
 ```
@@ -217,24 +213,12 @@ This is useful for troubleshooting connection issues.
 3. **Command Building**: Constructs sshuttle commands with proper SSH options
 4. **Execution**: Runs commands via shell for proper quote handling
 
-### Generated Commands
-
-Normal mode:
-```bash
-sshuttle -r user@host 10.0.0.0/8 --daemon --ssh-cmd="ssh -o StrictHostKeyChecking=no -i ~/.ssh/key.pem"
-```
-
-Debug mode:
-```bash
-sshuttle -v -r user@host 10.0.0.0/8 --ssh-cmd="ssh -o StrictHostKeyChecking=no -vvv -i ~/.ssh/key.pem"
-```
-
 ## Troubleshooting
 
 ### Common Issues
 
 1. **"sshuttle: command not found"**
-   - Install sshuttle: `pip install sshuttle` or use your package manager
+   - Install sshuttle: `brew install sshuttle`
 
 2. **SSH key not found**
    - Check the path in `extra_args`
@@ -258,15 +242,6 @@ sshuttle-selector --debug
 ```
 
 ## Development
-
-### Building from Source
-
-```bash
-git clone https://github.com/tgigli/sshuttle-selector-go.git
-cd sshuttle-selector-go
-go mod download
-go build -o sshuttle-selector main.go
-```
 
 ### Dependencies
 
