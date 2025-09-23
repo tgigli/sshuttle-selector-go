@@ -17,7 +17,6 @@ jobs:
   update-homebrew:
     name: Update Homebrew Formula
     runs-on: ubuntu-latest
-    if: secrets.HOMEBREW_TAP_TOKEN != ''
 
     steps:
     - name: Set release tag
