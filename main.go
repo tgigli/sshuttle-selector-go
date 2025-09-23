@@ -87,6 +87,7 @@ var (
 		Margin(1, 0, 2, 2)
 
 	debugMode = false
+	sshMode   = false
 )
 
 type itemType int
@@ -103,6 +104,7 @@ type item struct {
 	command     string
 	itemType    itemType
 	pid         int // for active tunnels
+	isSSHDirect bool // true if this is direct SSH connection
 }
 
 type activeTunnel struct {
@@ -253,12 +255,17 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						m.choice = fmt.Sprintf("Tunnel stopped: %s", i.destination)
 					}
 				case ItemAvailableTunnel:
-					// Kill any existing tunnel first, then start new one
-					if err := killAllTunnels(); err != nil {
-						log.Printf("Warning: Failed to kill existing tunnels: %v", err)
+					if i.isSSHDirect {
+						// Direct SSH connection - don't kill tunnels, just connect
+						m.choice = i.command
+					} else {
+						// Kill any existing tunnel first, then start new one
+						if err := killAllTunnels(); err != nil {
+							log.Printf("Warning: Failed to kill existing tunnels: %v", err)
+						}
+						// Start the selected tunnel
+						m.choice = i.command
 					}
-					// Start the selected tunnel
-					m.choice = i.command
 				case ItemAction:
 					if i.command == "add_new" {
 						m.choice = "add_new_tunnel"
@@ -422,12 +429,20 @@ func loadConfigTunnels() ([]list.Item, error) {
 	// Check if config file exists
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {
 		// Return default config if file doesn't exist
+		var exampleCommand string
+		if sshMode {
+			exampleCommand = "ssh -o StrictHostKeyChecking=no user@example.com"
+		} else {
+			exampleCommand = "sshuttle -r user@example.com 10.0.0.0/8"
+		}
+
 		return []list.Item{
 			item{
-				name:        "Example Server",
+				name:        "Example Server (example.com)",
 				destination: "user@example.com",
-				command:     "sshuttle -r user@example.com 10.0.0.0/8",
+				command:     exampleCommand,
 				itemType:    ItemAvailableTunnel,
+				isSSHDirect: sshMode,
 			},
 		}, nil
 	}
@@ -457,26 +472,37 @@ func loadConfigTunnels() ([]list.Item, error) {
 			sshCmd += " -vvv"
 		}
 
-		// Build sshuttle command
 		var command string
-		if debugMode {
-			// In debug mode, don't use --daemon and add -v flag
-			command = fmt.Sprintf("sshuttle -v -r %s@%s %s --ssh-cmd=\"%s\"", tunnel.User, tunnel.Host, tunnel.Subnets, sshCmd)
-		} else {
-			// Normal mode uses --daemon
-			command = fmt.Sprintf("sshuttle -r %s@%s %s --daemon --ssh-cmd=\"%s\"", tunnel.User, tunnel.Host, tunnel.Subnets, sshCmd)
-		}
+		var itemName string
 
-		// Add other extra args (excluding -i)
-		if tunnel.ExtraArgs != "" && !strings.Contains(tunnel.ExtraArgs, "-i ") {
-			command += " " + tunnel.ExtraArgs
+		if sshMode {
+			// SSH direct connection mode
+			command = fmt.Sprintf("%s %s@%s", sshCmd, tunnel.User, tunnel.Host)
+			itemName = fmt.Sprintf("%s (%s)", tunnel.Name, tunnel.Host)
+		} else {
+			// Sshuttle tunnel mode
+			if debugMode {
+				// In debug mode, don't use --daemon and add -v flag
+				command = fmt.Sprintf("sshuttle -v -r %s@%s %s --ssh-cmd=\"%s\"", tunnel.User, tunnel.Host, tunnel.Subnets, sshCmd)
+			} else {
+				// Normal mode uses --daemon
+				command = fmt.Sprintf("sshuttle -r %s@%s %s --daemon --ssh-cmd=\"%s\"", tunnel.User, tunnel.Host, tunnel.Subnets, sshCmd)
+			}
+
+			// Add other extra args (excluding -i)
+			if tunnel.ExtraArgs != "" && !strings.Contains(tunnel.ExtraArgs, "-i ") {
+				command += " " + tunnel.ExtraArgs
+			}
+
+			itemName = fmt.Sprintf("%s (%s)", tunnel.Name, tunnel.Host)
 		}
 
 		items[i] = item{
-			name:        tunnel.Name,
+			name:        itemName,
 			destination: fmt.Sprintf("%s@%s", tunnel.User, tunnel.Host),
 			command:     command,
 			itemType:    ItemAvailableTunnel,
+			isSSHDirect: sshMode,
 		}
 	}
 
@@ -632,6 +658,7 @@ func main() {
 	// Parse command line flags
 	debugFlag := flag.Bool("debug", false, "Enable debug mode (adds -v to sshuttle and -vvv to ssh)")
 	addFlag := flag.Bool("add", false, "Add new tunnel configuration")
+	sshFlag := flag.Bool("ssh", false, "Connect directly via SSH instead of creating tunnel")
 	nameFlag := flag.String("name", "", "Tunnel name (required with -add)")
 	hostFlag := flag.String("host", "", "SSH hostname (required with -add)")
 	userFlag := flag.String("user", "", "SSH username (required with -add)")
@@ -641,6 +668,7 @@ func main() {
 	flag.Parse()
 
 	debugMode = *debugFlag
+	sshMode = *sshFlag
 
 	// Handle CLI mode for adding configurations
 	if *addFlag {
@@ -660,7 +688,11 @@ func main() {
 
 	const defaultList = 20
 	l := list.New(items, itemDelegate{}, defaultWidth, defaultList)
-	l.Title = "SSH Tunnel Manager"
+	if sshMode {
+		l.Title = "SSH Connection Manager"
+	} else {
+		l.Title = "SSH Tunnel Manager"
+	}
 	l.SetShowStatusBar(false)
 	l.SetFilteringEnabled(true)
 	l.SetShowHelp(false)
@@ -693,8 +725,12 @@ func main() {
 			// Just print the status message
 			fmt.Println(finalModel.choice)
 		} else {
-			// Execute sshuttle command
-			fmt.Printf("Starting tunnel...\n")
+			// Check if it's an SSH direct connection or tunnel
+			if strings.HasPrefix(finalModel.choice, "ssh ") {
+				fmt.Printf("Connecting via SSH...\n")
+			} else {
+				fmt.Printf("Starting tunnel...\n")
+			}
 
 			// Use shell to execute the command properly
 			cmd := exec.Command("sh", "-c", finalModel.choice)
