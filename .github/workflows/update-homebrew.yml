@@ -1,0 +1,71 @@
+name: Update Homebrew Formula
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  update-homebrew:
+    name: Update Homebrew Formula
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout homebrew tap
+      uses: actions/checkout@v4
+      with:
+        repository: tgigli/homebrew-sshuttle-selector
+        token: ${{ secrets.GITHUB_TOKEN }}
+        path: homebrew-tap
+
+    - name: Download checksums
+      run: |
+        wget -q https://github.com/tgigli/sshuttle-selector-go/releases/download/${{ github.event.release.tag_name }}/checksums.txt
+        cat checksums.txt
+
+    - name: Extract checksums
+      id: checksums
+      run: |
+        echo "darwin_amd64=$(grep 'sshuttle-selector-darwin-amd64.tar.gz' checksums.txt | cut -d' ' -f1)" >> $GITHUB_OUTPUT
+        echo "darwin_arm64=$(grep 'sshuttle-selector-darwin-arm64.tar.gz' checksums.txt | cut -d' ' -f1)" >> $GITHUB_OUTPUT
+        echo "linux_amd64=$(grep 'sshuttle-selector-linux-amd64.tar.gz' checksums.txt | cut -d' ' -f1)" >> $GITHUB_OUTPUT
+        echo "linux_arm64=$(grep 'sshuttle-selector-linux-arm64.tar.gz' checksums.txt | cut -d' ' -f1)" >> $GITHUB_OUTPUT
+
+    - name: Update formula
+      run: |
+        cd homebrew-tap
+
+        # Update URLs and checksums in the formula
+        sed -i "s|download/v[0-9]\+\.[0-9]\+\.[0-9]\+/|download/${{ github.event.release.tag_name }}/|g" Formula/sshuttle-selector.rb
+
+        # Update darwin amd64 checksum
+        sed -i "/darwin-amd64\.tar\.gz/,/sha256/ s/sha256 \"[^\"]*\"/sha256 \"${{ steps.checksums.outputs.darwin_amd64 }}\"/" Formula/sshuttle-selector.rb
+
+        # Update darwin arm64 checksum
+        sed -i "/darwin-arm64\.tar\.gz/,/sha256/ s/sha256 \"[^\"]*\"/sha256 \"${{ steps.checksums.outputs.darwin_arm64 }}\"/" Formula/sshuttle-selector.rb
+
+        # Update linux amd64 checksum
+        sed -i "/linux-amd64\.tar\.gz/,/sha256/ s/sha256 \"[^\"]*\"/sha256 \"${{ steps.checksums.outputs.linux_amd64 }}\"/" Formula/sshuttle-selector.rb
+
+        # Update linux arm64 checksum
+        sed -i "/linux-arm64\.tar\.gz/,/sha256/ s/sha256 \"[^\"]*\"/sha256 \"${{ steps.checksums.outputs.linux_arm64 }}\"/" Formula/sshuttle-selector.rb
+
+    - name: Commit and push formula update
+      run: |
+        cd homebrew-tap
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+
+        git add Formula/sshuttle-selector.rb
+        git commit -m "Update formula to ${{ github.event.release.tag_name }}
+
+        - Update URLs to point to new release
+        - Update checksums for all platforms
+
+        🤖 Generated with [Claude Code](https://claude.ai/code)
+
+        Co-Authored-By: Claude <noreply@anthropic.com>"
+
+        git push origin main
