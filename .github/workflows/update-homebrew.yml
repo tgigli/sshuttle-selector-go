@@ -3,6 +3,12 @@ name: Update Homebrew Formula
 on:
   release:
     types: [published]
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Release tag to update formula for'
+        required: true
+        default: 'v0.0.5'
 
 permissions:
   contents: write
@@ -20,9 +26,18 @@ jobs:
         token: ${{ secrets.GITHUB_TOKEN }}
         path: homebrew-tap
 
+    - name: Set release tag
+      id: release_tag
+      run: |
+        if [ "${{ github.event_name }}" = "release" ]; then
+          echo "tag=${{ github.event.release.tag_name }}" >> $GITHUB_OUTPUT
+        else
+          echo "tag=${{ github.event.inputs.release_tag }}" >> $GITHUB_OUTPUT
+        fi
+
     - name: Download checksums
       run: |
-        wget -q https://github.com/tgigli/sshuttle-selector-go/releases/download/${{ github.event.release.tag_name }}/checksums.txt
+        wget -q https://github.com/tgigli/sshuttle-selector-go/releases/download/${{ steps.release_tag.outputs.tag }}/checksums.txt
         cat checksums.txt
 
     - name: Extract checksums
@@ -38,7 +53,7 @@ jobs:
         cd homebrew-tap
 
         # Update URLs and checksums in the formula
-        sed -i "s|download/v[0-9]\+\.[0-9]\+\.[0-9]\+/|download/${{ github.event.release.tag_name }}/|g" Formula/sshuttle-selector.rb
+        sed -i "s|download/v[0-9]\+\.[0-9]\+\.[0-9]\+/|download/${{ steps.release_tag.outputs.tag }}/|g" Formula/sshuttle-selector.rb
 
         # Update darwin amd64 checksum
         sed -i "/darwin-amd64\.tar\.gz/,/sha256/ s/sha256 \"[^\"]*\"/sha256 \"${{ steps.checksums.outputs.darwin_amd64 }}\"/" Formula/sshuttle-selector.rb
