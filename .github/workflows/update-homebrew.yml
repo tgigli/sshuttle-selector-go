@@ -49,6 +49,10 @@ jobs:
       run: |
         cd homebrew-tap
 
+        # Update version field (extract version number from tag, removing 'v' prefix)
+        VERSION=$(echo "${{ steps.release_tag.outputs.tag }}" | sed 's/^v//')
+        sed -i "s/version \"[^\"]*\"/version \"$VERSION\"/" Formula/sshuttle-selector.rb
+
         # Update URLs to new release
         sed -i "s|download/v[0-9]\+\.[0-9]\+\.[0-9]\+/|download/${{ steps.release_tag.outputs.tag }}/|g" Formula/sshuttle-selector.rb
 
