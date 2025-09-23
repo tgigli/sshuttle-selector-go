@@ -6,13 +6,15 @@ A modern, interactive TUI (Terminal User Interface) for managing SSH tunnels wit
 
 ## Features
 
-- 🔍 **Interactive Selection**: Browse and select tunnels using a beautiful TUI
+- 🔍 **Interactive Selection**: Browse and select servers using a beautiful TUI
 - 🔄 **Active Tunnel Management**: View and terminate running tunnels
+- 🔗 **Dual Mode Operation**: Choose between sshuttle tunnels or direct SSH connections
 - 📝 **YAML Configuration**: Simple configuration file format
-- 🚀 **Quick Launch**: Start tunnels with a single keypress
+- 🚀 **Quick Launch**: Start tunnels or SSH connections with a single keypress
 - 🐛 **Debug Mode**: Verbose logging for troubleshooting
 - 💾 **Daemon Mode**: Tunnels run in background by default
 - 🎯 **Smart SSH Key Handling**: Automatically uses SSH keys from config
+- 🏷️ **Hostname Display**: Show server hostnames alongside names for easy identification
 
 ## Installation
 
@@ -101,12 +103,23 @@ tunnels:
 ### Interactive Mode
 
 ```bash
-# Start the selector
+# Start the selector (tunnel mode)
 sshuttle-selector
+
+# Start in SSH direct connection mode
+sshuttle-selector --ssh
 
 # Start with debug mode (verbose logging, no daemon)
 sshuttle-selector --debug
+
+# Combine flags
+sshuttle-selector --ssh --debug
 ```
+
+#### Modes
+
+- **Tunnel Mode** (default): Creates sshuttle tunnels for secure network access
+- **SSH Mode** (`--ssh`): Connects directly via SSH without creating tunnels
 
 ### CLI Mode - Add Configuration
 
