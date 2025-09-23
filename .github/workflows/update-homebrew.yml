@@ -2,13 +2,13 @@ name: Update Homebrew Formula
 
 on:
   release:
-    types: [published]
+    types: [published, created, released]
   workflow_dispatch:
     inputs:
       release_tag:
         description: 'Release tag to update formula for'
         required: true
-        default: 'v0.0.5'
+        default: 'v0.0.6'
 
 permissions:
   contents: read
