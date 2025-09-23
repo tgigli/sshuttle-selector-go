@@ -32,6 +32,29 @@ brew install sshuttle-selector
 - `sshuttle` installed via Homebrew
 - SSH access to your servers
 
+## Releases
+
+### Supported Platforms
+
+Binary releases are available for:
+
+#### Linux
+- **amd64**: `sshuttle-selector-linux-amd64.tar.gz`
+- **arm64**: `sshuttle-selector-linux-arm64.tar.gz`
+- **386**: `sshuttle-selector-linux-386.tar.gz`
+
+#### macOS
+- **Intel (amd64)**: `sshuttle-selector-darwin-amd64.tar.gz`
+- **Apple Silicon (arm64)**: `sshuttle-selector-darwin-arm64.tar.gz`
+
+### Versioning
+
+This project follows semantic versioning starting from `0.0.1`:
+- **0.x.x**: Development versions with potential breaking changes
+- **1.x.x**: Stable releases (future)
+
+Download the latest release from the [GitHub Releases](https://github.com/tgigli/sshuttle-selector-go/releases) page.
+
 ## Configuration
 
 Create the configuration directory and file:
